@@ -18,6 +18,7 @@ from src.config import (
     resolve_llm_channel_api_keys,
     resolve_llm_channel_names,
     resolve_llm_channel_protocol,
+    DEEPSEEK_DEFAULT_LLM_MODEL,
 )
 from src.llm.hermes import is_reserved_hermes_name
 
@@ -495,8 +496,8 @@ def _resolve_llm_model(channels: list[dict[str, object]]) -> str:
     if os.getenv("OLLAMA_API_BASE"):
         ollama_model = os.getenv("OLLAMA_MODEL", "").strip()
         return f"ollama/{ollama_model}" if ollama_model else DEFAULT_LLM_MODEL
-    if os.getenv("DEEPSEEK_API_KEY"):
-        return "deepseek/deepseek-chat"
+    if os.getenv("DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API_KEYS"):
+        return DEEPSEEK_DEFAULT_LLM_MODEL
     if os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEYS"):
         return _normalize_litellm_model(os.getenv("GEMINI_MODEL", DEFAULT_LLM_MODEL), "gemini")
     if os.getenv("OPENAI_API_KEY"):

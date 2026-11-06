@@ -99,6 +99,9 @@ def build_market_review_runtime(
             brave_keys=getattr(config, "brave_api_keys", None),
             serpapi_keys=getattr(config, "serpapi_keys", None),
             minimax_keys=getattr(config, "minimax_api_keys", None),
+            deepseek_keys=getattr(config, "deepseek_search_api_keys", None),
+            deepseek_base_url=getattr(config, "deepseek_search_base_url", None),
+            deepseek_need_content=bool(getattr(config, "deepseek_search_need_content", False)),
             searxng_base_urls=getattr(config, "searxng_base_urls", None),
             searxng_public_instances_enabled=getattr(
                 config,

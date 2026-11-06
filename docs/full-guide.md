@@ -57,16 +57,17 @@ daily_stock_analysis/
 
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
-| `MODELFLARE_KEY` | [Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis) API Key，自动补齐默认地址和模型 | 推荐 |
-| `AIHUBMIX_KEY` | [AIHubMix](https://inferera.com/?aff=CfMq) API Key，一 Key 切换使用全系模型，本项目可享 10% 优惠 | 推荐 |
+| `DEEPSEEK_API_KEY` | [DeepSeek 官方](https://platform.deepseek.com) API Key：主模型自动使用 `deepseek/deepseek-v4-flash`，同一把 Key 还自动作为新闻搜索源（DeepSeek Search API） | 推荐 |
+| `MODELFLARE_KEY` | [Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis) API Key，自动补齐默认地址和模型 | 可选 |
+| `AIHUBMIX_KEY` | [AIHubMix](https://inferera.com/?aff=CfMq) API Key，一 Key 切换使用全系模型，本项目可享 10% 优惠 | 可选 |
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/) 获取免费 Key | 可选 |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 可选 |
-| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持 DeepSeek、通义千问等） | 可选 |
-| `OPENAI_BASE_URL` | OpenAI 兼容 API 地址（如 `https://api.deepseek.com`） | 可选 |
-| `OPENAI_MODEL` | 模型名称（如 `gemini-3.1-pro-preview`、`deepseek-v4-flash`、`gpt-5.5`） | 可选 |
+| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持通义千问等） | 可选 |
+| `OPENAI_BASE_URL` | OpenAI 兼容 API 地址 | 可选 |
+| `OPENAI_MODEL` | 模型名称（如 `gemini-3.1-pro-preview`、`gpt-5.5`） | 可选 |
 | `ANSPIRE_API_KEYS` | Anspire 搜索与 LLM 共用 Key 的 legacy 兼容入口；模型权限以控制台为准 | 可选 |
 
-> *注：以上模型 Key / 渠道至少配置一个。Modelflare 只需填写 `MODELFLARE_KEY`，单渠道默认模型为 `openai/gpt-6.1-sol`（可通过 `LITELLM_MODEL` 覆盖），接入地址默认使用 `https://modelflare.dev/v1`，完整示例见 [LLM 配置指南](LLM_CONFIG_GUIDE.md#示例modelflare)。实际模型以账号权限为准。启动时配置校验会在缺少可用 AI 模型 Key 或模型渠道时给出明确错误提示。
+> *注：以上模型 Key / 渠道至少配置一个。DeepSeek 只需填写 `DEEPSEEK_API_KEY`，主模型自动推导为 `deepseek/deepseek-v4-flash`（`deepseek-chat` 已被官方标记为 2026/07/24 后废弃，仅显式配置时仍兼容并告警）；多 Key 用 `DEEPSEEK_API_KEYS`。Modelflare 只需填写 `MODELFLARE_KEY`，单渠道默认模型为 `openai/gpt-6.1-sol`（可通过 `LITELLM_MODEL` 覆盖），接入地址默认使用 `https://modelflare.dev/v1`，完整示例见 [LLM 配置指南](LLM_CONFIG_GUIDE.md#示例modelflare)。实际模型以账号权限为准。启动时配置校验会在缺少可用 AI 模型 Key 或模型渠道时给出明确错误提示。
 
 #### 通知渠道配置（可同时配置多个，全部推送）
 
@@ -158,6 +159,7 @@ daily_stock_analysis/
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
 | `STOCK_LIST` | 自选股代码，如 `600519,300750,002594,7203.T,005930.KS`；推荐使用英文逗号，中文逗号、顿号、分号、空格和换行会被识别并规范为英文逗号 | ✅ |
+| `DEEPSEEK_SEARCH_API_KEYS` | [DeepSeek Search API](https://api-docs.deepseek.com/zh-cn/guides/search) Key（结构化结果，支持 `site:`/`lang:`/`after:`）；留空自动复用 `DEEPSEEK_API_KEYS` / `DEEPSEEK_API_KEY` | 推荐 |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 针对中文内容特别优化；同一 Key 可用于搜索与 Anspire 大模型网关的兜底示例（是否可用以控制台与账号权限为准） | 推荐 |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/github-daily-stock-analysis) 搜索引擎结果补强，适合实时金融新闻 | 推荐 |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新闻搜索） | 可选 |
@@ -378,7 +380,11 @@ daily_stock_analysis/
 
 | 变量名 | 说明 | 必填 |
 |--------|------|:----:|
-| `ANSPIRE_API_KEYS` | Anspire Open API Key（可用于搜索与大模型网关共享场景的配置示例；是否可用取决于账号权限与网关可见性，可有效增强 A 股分析效果） | 推荐 |
+| `DEEPSEEK_SEARCH_API_KEYS` | DeepSeek 官方 Search API（自研搜索引擎，结构化结果：title/url/summary/date/authority，支持 `site:`/`lang:`/`after:` 语法）；**留空自动复用 `DEEPSEEK_API_KEYS` / `DEEPSEEK_API_KEY`** | 推荐 |
+| `DEEPSEEK_SEARCH_ENABLED` | 是否复用 DeepSeek Key 做新闻搜索（默认 `true`；只想用 DeepSeek 跑模型时设为 `false`） | 可选 |
+| `DEEPSEEK_SEARCH_BASE_URL` | DeepSeek Search 端点根地址（默认 `https://api.deepseek.com`） | 可选 |
+| `DEEPSEEK_SEARCH_NEED_CONTENT` | 是否让搜索直接返回网页正文 `content`（默认 `false`，开启后更慢、更费 token） | 可选 |
+| `ANSPIRE_API_KEYS` | Anspire Open API Key（可用于搜索与大模型网关共享场景的配置示例；是否可用取决于账号权限与网关可见性，可有效增强 A 股分析效果） | 可选 |
 | `SERPAPI_API_KEYS` | SerpAPI 搜索引擎结果补强，适合实时金融新闻 | 推荐 |
 | `TAVILY_API_KEYS` | Tavily 搜索 API Key | 可选 |
 | `BOCHA_API_KEYS` | 博查搜索 API Key（中文优化） | 可选 |
@@ -394,6 +400,10 @@ daily_stock_analysis/
 | `BIAS_THRESHOLD` | 乖离率阈值（%），超过提示不追高；强势趋势股自动放宽到 1.5 倍 | 默认 `5.0` |
 
 > 行为说明：搜索服务与社交舆情服务为可选增强链路。任一服务初始化失败时，系统会记录 warning 并降级为跳过该服务，仅影响对应环节，不会阻塞技术面主链路和主任务流。
+>
+> DeepSeek 搜索说明：Provider 为 `DeepSeek`，走 `POST {DEEPSEEK_SEARCH_BASE_URL}/v1/tools/search`，与 Chat Completions 共用 Bearer Key。时间窗口通过 `after:YYYY-MM-DD` 查询语法下推给服务端（`NEWS_MAX_AGE_DAYS` / `NEWS_STRATEGY_PROFILE` 决定天数），客户端再按 `date` 字段兜底过滤；`snippet` 取长摘要 `summary`，来源取 `site_name`。连续 3 次失败触发 300 秒熔断。
+>
+> 搜索优先级：Anspire > DeepSeek > Bocha > Tavily > Brave > SerpAPI > MiniMax > SearXNG。
 
 ### 新闻检索可解释排序（Issue #1356）
 

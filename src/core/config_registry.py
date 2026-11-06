@@ -732,7 +732,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     # ------------------------------------------------------------------
     "DEEPSEEK_API_KEY": {
         "title": "DeepSeek API Key",
-        "description": "Official DeepSeek API key (from https://platform.deepseek.com). For compatibility, a key set alone still auto-infers deepseek/deepseek-chat and logs a deprecation warning; new configs should migrate to deepseek/deepseek-v4-flash. Also works in multi-channel mode.",
+        "description": "Official DeepSeek API key (from https://platform.deepseek.com). A single key covers both the main model (auto-infers deepseek/deepseek-v4-flash) and the DeepSeek Search API for news search. Also works in multi-channel mode.",
         "category": "ai_model",
         "data_type": "string",
         "ui_control": "password",
@@ -1179,7 +1179,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "MINIMAX_API_KEYS": {
         "title": "MiniMax API Key",
-        "description": "MiniMax API key (search priority: Bocha > Tavily > Brave > SerpAPI > MiniMax > SearXNG).",
+        "description": "MiniMax API key (search priority: Anspire > DeepSeek > Bocha > Tavily > Brave > SerpAPI > MiniMax > SearXNG).",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "password",
@@ -1190,6 +1190,74 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"multi_value": True, "delimiter": ","},
         "display_order": 53,
+    },
+    "DEEPSEEK_SEARCH_API_KEYS": {
+        "title": "DeepSeek Search API Keys",
+        "description": "Comma-separated DeepSeek API keys for the official Search API (structured results). Falls back to DEEPSEEK_API_KEYS / DEEPSEEK_API_KEY when empty (search priority: Anspire > DeepSeek > Bocha > Tavily > Brave > SerpAPI > MiniMax > SearXNG).",
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {"multi_value": True, "delimiter": ","},
+        "display_order": 25,
+        "help_key": "settings.data_source.search_api_keys",
+        "examples": [
+            "DEEPSEEK_SEARCH_API_KEYS=sk-xxxx",
+            "DEEPSEEK_SEARCH_API_KEYS=sk-key-1,sk-key-2",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：搜索服务配置",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#搜索服务配置",
+            },
+        ],
+        "warning_codes": ["secret_value", "comma_separated_keys"],
+    },
+    "DEEPSEEK_SEARCH_ENABLED": {
+        "title": "DeepSeek Search Enabled",
+        "description": "Use a configured DeepSeek key as a news search provider. Default true; set false to keep DeepSeek for LLM only.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 26,
+    },
+    "DEEPSEEK_SEARCH_BASE_URL": {
+        "title": "DeepSeek Search Base URL",
+        "description": "Base URL for the DeepSeek Search API. Default https://api.deepseek.com; point at an OpenAI-compatible gateway only if it proxies /v1/tools/search.",
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "https://api.deepseek.com",
+        "options": [],
+        "validation": {"item_type": "url", "allowed_schemes": ["http", "https"]},
+        "display_order": 27,
+    },
+    "DEEPSEEK_SEARCH_NEED_CONTENT": {
+        "title": "DeepSeek Search Return Content",
+        "description": "Ask the DeepSeek Search API to return full page content (need_content). Slower and larger payload; default false.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 28,
     },
     "SEARXNG_BASE_URLS": {
         "title": "SearXNG Base URLs",
@@ -4843,6 +4911,41 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
         "docs": _DOC_FULL_GUIDE_SEARCH,
         "warning_codes": ["secret_value", "comma_separated_keys"],
     },
+    "DEEPSEEK_SEARCH_API_KEYS": {
+        "help_key": "settings.data_source.search_api_keys",
+        "examples": [
+            "DEEPSEEK_SEARCH_API_KEYS=sk-xxxx",
+            "DEEPSEEK_SEARCH_API_KEYS=sk-key-1,sk-key-2",
+        ],
+        "docs": _DOC_FULL_GUIDE_SEARCH,
+        "warning_codes": ["secret_value", "comma_separated_keys"],
+    },
+    "DEEPSEEK_SEARCH_ENABLED": {
+        "help_key": "settings.data_source.search_api_keys",
+        "examples": [
+            "DEEPSEEK_SEARCH_ENABLED=true",
+            "DEEPSEEK_SEARCH_ENABLED=false",
+        ],
+        "docs": _DOC_FULL_GUIDE_SEARCH,
+        "warning_codes": [],
+    },
+    "DEEPSEEK_SEARCH_BASE_URL": {
+        "help_key": "settings.data_source.search_api_keys",
+        "examples": [
+            "DEEPSEEK_SEARCH_BASE_URL=https://api.deepseek.com",
+        ],
+        "docs": _DOC_FULL_GUIDE_SEARCH,
+        "warning_codes": [],
+    },
+    "DEEPSEEK_SEARCH_NEED_CONTENT": {
+        "help_key": "settings.data_source.search_api_keys",
+        "examples": [
+            "DEEPSEEK_SEARCH_NEED_CONTENT=false",
+            "DEEPSEEK_SEARCH_NEED_CONTENT=true",
+        ],
+        "docs": _DOC_FULL_GUIDE_SEARCH,
+        "warning_codes": [],
+    },
     "SEARXNG_PUBLIC_INSTANCES_ENABLED": {
         "help_key": "settings.data_source.SEARXNG_BASE_URLS",
         "examples": [
@@ -5188,6 +5291,8 @@ def _infer_category(key: str) -> str:
         return "base"
     if key.startswith("BACKTEST_"):
         return "backtest"
+    if key.startswith("DEEPSEEK_SEARCH_"):
+        return "data_source"
     if key.startswith(("GEMINI_", "OPENAI_", "ANTHROPIC_", "LITELLM_", "AIHUBMIX_", "DEEPSEEK_", "LLM_")):
         return "ai_model"
     if key.endswith("_PRIORITY") or key.startswith(

@@ -86,11 +86,12 @@
 
 | Secret 名稱 | 說明 | 必填 |
 |-------------|------|:----:|
-| `MODELFLARE_KEY` | [Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis) API Key，低成本接入全球熱門大模型 | **推薦** |
-| `AIHUBMIX_KEY` | [AIHubMix](https://inferera.com/?aff=CfMq) API Key，一 Key 切換使用全系模型，本項目可享 10% 優惠 | **推薦** |
+| `DEEPSEEK_API_KEY` | [DeepSeek 官方](https://platform.deepseek.com) API Key：主模型自動使用 `deepseek/deepseek-v4-flash`，同一把 Key 亦驅動下方 DeepSeek 新聞搜尋 | **推薦** |
+| `MODELFLARE_KEY` | [Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis) API Key，低成本接入全球熱門大模型 | 可選 |
+| `AIHUBMIX_KEY` | [AIHubMix](https://inferera.com/?aff=CfMq) API Key，一 Key 切換使用全系模型，本項目可享 10% 優惠 | 可選 |
 | `GEMINI_API_KEY` | Google Gemini API Key | 可選 |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 可選 |
-| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支援 DeepSeek、通義千問等） | 可選 |
+| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支援通義千問等） | 可選 |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | 使用 OpenAI 兼容服務時填寫 | 可選 |
 
 > Ollama 更適合本地 / Docker 部署，GitHub Actions 推薦使用雲端 API。
@@ -120,8 +121,9 @@
 
 | Secret 名稱 | 說明 | 必填 |
 |-------------|------|:----:|
-| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/dsa?share_code=QFBC0FYC)：匯聚全球輿情信息，適配 A股、美股、港股等新聞和輿情檢索；同一 Key 可複用大模型服務；本項目新用戶可獲得 30 元等額的免費點數 | **推薦** |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/github-daily-stock-analysis)：搜尋引擎結果補強，適合即時金融新聞 | **推薦** |
+| `DEEPSEEK_SEARCH_API_KEYS` | [DeepSeek 官方 Search API](https://api-docs.deepseek.com/zh-cn/guides/search)：自研搜尋引擎，回傳結構化結果（title/url/summary/date/authority），支援 `site:`/`lang:`/`after:` 語法；**留空時自動複用 `DEEPSEEK_API_KEYS` / `DEEPSEEK_API_KEY`，一把 Key 同時跑模型與新聞搜尋** | **推薦** |
+| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/dsa?share_code=QFBC0FYC)：匯聚全球輿情信息，適配 A股、美股、港股等新聞和輿情檢索；同一 Key 可複用大模型服務；本項目新用戶可獲得 30 元等額的免費點數 | 可選 |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/github-daily-stock-analysis)：搜尋引擎結果補強，適合即時金融新聞 | 可選 |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/)：通用新聞搜尋 API | 可選 |
 | `BOCHA_API_KEYS` | [博查搜尋](https://open.bocha.cn/)：中文搜尋優化，支援 AI 摘要 | 可選 |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/)：隱私優先，美股資訊補強 | 可選 |

@@ -327,6 +327,10 @@ jobs:
           TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
           SERPAPI_API_KEYS: ${{ secrets.SERPAPI_API_KEYS }}
           MINIMAX_API_KEYS: ${{ secrets.MINIMAX_API_KEYS }}
+          DEEPSEEK_SEARCH_API_KEYS: ${{ secrets.DEEPSEEK_SEARCH_API_KEYS }}
+          DEEPSEEK_SEARCH_ENABLED: ${{ vars.DEEPSEEK_SEARCH_ENABLED || secrets.DEEPSEEK_SEARCH_ENABLED }}
+          DEEPSEEK_SEARCH_BASE_URL: ${{ vars.DEEPSEEK_SEARCH_BASE_URL || secrets.DEEPSEEK_SEARCH_BASE_URL }}
+          DEEPSEEK_SEARCH_NEED_CONTENT: ${{ vars.DEEPSEEK_SEARCH_NEED_CONTENT || secrets.DEEPSEEK_SEARCH_NEED_CONTENT }}
           BRAVE_API_KEYS: ${{ secrets.BRAVE_API_KEYS }}
           SEARXNG_BASE_URLS: ${{ vars.SEARXNG_BASE_URLS || secrets.SEARXNG_BASE_URLS }}
           SEARXNG_PUBLIC_INSTANCES_ENABLED: ${{ vars.SEARXNG_PUBLIC_INSTANCES_ENABLED || secrets.SEARXNG_PUBLIC_INSTANCES_ENABLED }}
@@ -512,6 +516,11 @@ jobs:
           fi
           echo ""
           echo "【搜索引擎】"
+          if [ -n "$DEEPSEEK_SEARCH_API_KEYS" ] || [ -n "$DEEPSEEK_API_KEYS" ] || [ -n "$DEEPSEEK_API_KEY" ]; then
+            echo "  DeepSeek Search: ✅ 已配置（Key 复用；DEEPSEEK_SEARCH_ENABLED=${DEEPSEEK_SEARCH_ENABLED:-true}）"
+          else
+            echo "  DeepSeek Search: ⚪ 未配置"
+          fi
           echo "  Bocha API Keys: $([ -n "$BOCHA_API_KEYS" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  Tavily API Keys: $([ -n "$TAVILY_API_KEYS" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  SerpAPI Keys: $([ -n "$SERPAPI_API_KEYS" ] && echo '✅ 已配置' || echo '⚪ 未配置')"

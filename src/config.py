@@ -98,6 +98,12 @@ class ConfigIssue:
 
 
 _MANAGED_LITELLM_KEY_PROVIDERS = {"gemini", "vertex_ai", "anthropic", "openai", "deepseek"}
+
+# DeepSeek 官方默认值：仅配置 DEEPSEEK_API_KEY 时自动推导的主模型与搜索端点。
+# deepseek-chat 已被官方标记为 2026-07-24 后废弃，新配置统一走 deepseek-v4-flash。
+DEEPSEEK_DEFAULT_LLM_MODEL = "deepseek/deepseek-v4-flash"
+DEEPSEEK_LEGACY_LLM_MODEL = "deepseek/deepseek-chat"
+DEEPSEEK_SEARCH_BASE_URL_DEFAULT = "https://api.deepseek.com"
 SUPPORTED_LLM_CHANNEL_PROTOCOLS = ("openai", "anthropic", "gemini", "vertex_ai", "deepseek", "ollama")
 SUPPORTED_LLM_CHANNEL_API_SURFACES = ("chat_completions", "responses")
 _FALLBACK_LITELLM_MODEL_PROVIDERS = _MANAGED_LITELLM_KEY_PROVIDERS | set(SUPPORTED_LLM_CHANNEL_PROTOCOLS) | {
@@ -1088,6 +1094,9 @@ class Config:
     anspire_api_keys: List[str] = field(default_factory=list)  # Anspire Search API Keys
     bocha_api_keys: List[str] = field(default_factory=list)  # Bocha API Keys
     minimax_api_keys: List[str] = field(default_factory=list)  # MiniMax API Keys
+    deepseek_search_api_keys: List[str] = field(default_factory=list)  # DeepSeek Search API Keys（默认复用 DEEPSEEK_API_KEYS）
+    deepseek_search_base_url: str = DEEPSEEK_SEARCH_BASE_URL_DEFAULT  # DeepSeek Search API Base URL
+    deepseek_search_need_content: bool = False  # 是否让 DeepSeek 搜索返回网页正文
     tavily_api_keys: List[str] = field(default_factory=list)  # Tavily API Keys
     brave_api_keys: List[str] = field(default_factory=list)  # Brave Search API Keys
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
@@ -1638,7 +1647,6 @@ class Config:
         # the higher-priority sources and Hermes blocking issues are known.
         litellm_model_explicit = os.getenv('LITELLM_MODEL', '').strip()
         litellm_model = litellm_model_explicit
-        inferred_legacy_deepseek_model = False
         _openai_model_env = os.getenv('OPENAI_MODEL', '').strip()
         if using_anspire_llm_legacy:
             _openai_model_name = _anspire_llm_model_env or _openai_model_env or ANSPIRE_LLM_MODEL_DEFAULT
@@ -1719,8 +1727,7 @@ class Config:
                 elif anthropic_api_keys:
                     litellm_model = f'anthropic/{_anthropic_model_name}'
                 elif deepseek_api_keys:
-                    litellm_model = 'deepseek/deepseek-chat'
-                    inferred_legacy_deepseek_model = True
+                    litellm_model = DEEPSEEK_DEFAULT_LLM_MODEL
                 elif openai_api_keys:
                     # For openai-compatible models, add prefix only if not already prefixed
                     if '/' not in _openai_model_name:
@@ -1735,11 +1742,13 @@ class Config:
                     _fb = f'gemini/{_gemini_fallback}' if '/' not in _gemini_fallback else _gemini_fallback
                     litellm_fallback_models = [_fb]
 
-        if (
-            inferred_legacy_deepseek_model
-            and llm_models_source == "legacy_env"
-            and litellm_model == 'deepseek/deepseek-chat'
-        ):
+        # deepseek-chat 已被官方标记为 2026-07-24 后废弃：自动推断已切到
+        # deepseek-v4-flash，这里只对用户显式写死的旧模型给出迁移提示。
+        if llm_model_list and any(
+            str((m.get("litellm_params") or {}).get("model") or m.get("model_name") or "").strip()
+            == DEEPSEEK_LEGACY_LLM_MODEL
+            for m in llm_model_list
+        ) or litellm_model == DEEPSEEK_LEGACY_LLM_MODEL:
             logger.warning(
                 "Deprecation warning:\n"
                 "deepseek-chat will be deprecated on 2026-07-24,\n"
@@ -1820,7 +1829,23 @@ class Config:
 
         minimax_keys_str = os.getenv('MINIMAX_API_KEYS', '')
         minimax_api_keys = [k.strip() for k in minimax_keys_str.split(',') if k.strip()]
-        
+
+        # DeepSeek Search API：默认复用 DEEPSEEK_API_KEYS / DEEPSEEK_API_KEY
+        # （同一把 Bearer Key 同时覆盖 Chat Completions 与 Search/Fetch 接口）
+        deepseek_search_enabled = parse_env_bool(os.getenv('DEEPSEEK_SEARCH_ENABLED'), default=True)
+        deepseek_search_keys_str = os.getenv('DEEPSEEK_SEARCH_API_KEYS', '')
+        deepseek_search_api_keys = [k.strip() for k in deepseek_search_keys_str.split(',') if k.strip()]
+        if not deepseek_search_api_keys:
+            deepseek_search_api_keys = list(deepseek_api_keys)
+        if not deepseek_search_enabled:
+            deepseek_search_api_keys = []
+        deepseek_search_base_url = (
+            os.getenv('DEEPSEEK_SEARCH_BASE_URL') or DEEPSEEK_SEARCH_BASE_URL_DEFAULT
+        ).strip().rstrip('/') or DEEPSEEK_SEARCH_BASE_URL_DEFAULT
+        deepseek_search_need_content = parse_env_bool(
+            os.getenv('DEEPSEEK_SEARCH_NEED_CONTENT'), default=False
+        )
+
         tavily_keys_str = os.getenv('TAVILY_API_KEYS', '')
         tavily_api_keys = [k.strip() for k in tavily_keys_str.split(',') if k.strip()]
         
@@ -2018,6 +2043,9 @@ class Config:
             anspire_api_keys=anspire_api_keys,
             bocha_api_keys=bocha_api_keys,
             minimax_api_keys=minimax_api_keys,
+            deepseek_search_api_keys=deepseek_search_api_keys,
+            deepseek_search_base_url=deepseek_search_base_url,
+            deepseek_search_need_content=deepseek_search_need_content,
             tavily_api_keys=tavily_api_keys,
             brave_api_keys=brave_api_keys,
             serpapi_keys=serpapi_keys,
@@ -3189,6 +3217,7 @@ class Config:
             self.anspire_api_keys
             or self.bocha_api_keys
             or self.minimax_api_keys
+            or self.deepseek_search_api_keys
             or self.tavily_api_keys
             or self.brave_api_keys
             or self.serpapi_keys

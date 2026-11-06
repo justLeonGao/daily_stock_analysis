@@ -12,6 +12,7 @@ from src.analyzer import GeminiAnalyzer
 from src.config import (
     ANSPIRE_LLM_BASE_URL_DEFAULT,
     ANSPIRE_LLM_MODEL_DEFAULT,
+    DEEPSEEK_DEFAULT_LLM_MODEL,
     Config,
     _get_litellm_provider,
     _uses_direct_env_provider,
@@ -823,7 +824,7 @@ class GenerationBackendStatusService:
             or ""
         )
         if deepseek_keys:
-            return "deepseek/deepseek-chat"
+            return DEEPSEEK_DEFAULT_LLM_MODEL
 
         if cls._openai_keys_from_map(effective_map):
             model = (effective_map.get("OPENAI_MODEL") or "gpt-5.5").strip()

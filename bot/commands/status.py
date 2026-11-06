@@ -104,6 +104,7 @@ class StatusCommand(BotCommand):
         )
         
         # 搜索服务状态
+        status["search_deepseek"] = len(getattr(config, "deepseek_search_api_keys", []) or []) > 0
         status["search_bocha"] = len(config.bocha_api_keys) > 0
         status["search_tavily"] = len(config.tavily_api_keys) > 0
         status["search_brave"] = len(config.brave_api_keys) > 0
@@ -181,6 +182,7 @@ class StatusCommand(BotCommand):
             ),
             "",
             "**🔍 搜索服务**",
+            f"• DeepSeek: {icon(status['search_deepseek'])}",
             f"• Bocha: {icon(status['search_bocha'])}",
             f"• Tavily: {icon(status['search_tavily'])}",
             f"• Brave: {icon(status['search_brave'])}",

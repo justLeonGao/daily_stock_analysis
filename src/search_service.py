@@ -6,7 +6,7 @@ A股自选股智能分析系统 - 搜索服务模块
 
 职责：
 1. 提供统一的新闻搜索接口
-2. 支持 Bocha、Tavily、Brave、SerpAPI、SearXNG 多种搜索引擎
+2. 支持 DeepSeek、Bocha、Tavily、Brave、SerpAPI、MiniMax、SearXNG 多种搜索引擎
 3. 多 Key 负载均衡和故障转移
 4. 搜索结果缓存和格式化
 """
@@ -174,6 +174,50 @@ _SEARCH_TRANSIENT_EXCEPTIONS = (
     requests.exceptions.Timeout,
     requests.exceptions.ChunkedEncodingError,
 )
+
+
+def _search_time_hint(days: int, is_chinese: bool = True) -> str:
+    """Build a human-readable recency hint used by providers without date filters."""
+    if is_chinese:
+        if days <= 1:
+            return "今天"
+        elif days <= 3:
+            return "最近三天"
+        elif days <= 7:
+            return "最近一周"
+        return "最近一个月"
+    if days <= 1:
+        return "today"
+    elif days <= 3:
+        return "past 3 days"
+    elif days <= 7:
+        return "past week"
+    return "past month"
+
+
+def _search_date_within_days(date_str: Optional[str], days: int) -> bool:
+    """Return True when *date_str* falls inside the last *days* days.
+
+    Unparseable or missing dates are kept (best-effort filtering).
+    """
+    if not date_str:
+        return True
+    try:
+        from dateutil import parser as dateutil_parser
+
+        dt = dateutil_parser.parse(str(date_str), fuzzy=True)
+        now = datetime.now(timezone.utc) if dt.tzinfo else datetime.now()
+        return (now - dt) <= timedelta(days=days + 1)  # +1 buffer
+    except Exception:
+        return True
+
+
+def _search_recency_operator(days: int) -> Optional[str]:
+    """Return an ``after:YYYY-MM-DD`` query operator for providers supporting it."""
+    if not days or days <= 0:
+        return None
+    cutoff = datetime.now(timezone.utc) - timedelta(days=int(days))
+    return f"after:{cutoff.strftime('%Y-%m-%d')}"
 
 
 @retry(
@@ -1394,6 +1438,240 @@ class AnspireSearchProvider(BaseSearchProvider):
             return '未知来源'
 
 
+class DeepSeekSearchProvider(BaseSearchProvider):
+    """DeepSeek 官方 Search API（自研搜索引擎，返回结构化结果）
+
+    特点：
+    - 与 DeepSeek Chat Completions 共用同一把 Bearer Key（只需 DEEPSEEK_API_KEY 即可同时供模型和新闻源使用）
+    - 结构化结果：title / url / snippet / summary / content / site_name / date / authority
+    - 支持 site: / -site: / lang: / after: / before: / "精确短语" 等查询语法，
+      因此时间窗口用 ``after:`` 下推给服务端，再叠加客户端日期兜底过滤
+    - need_content 打开时直接返回网页正文，便于做 RAG / 深度摘要
+    - 熔断保护：连续 3 次失败 -> 300s 冷却
+
+    文档：https://api-docs.deepseek.com/zh-cn/guides/search
+    接口：POST {base_url}/v1/tools/search
+    """
+
+    DEFAULT_BASE_URL = "https://api.deepseek.com"
+    SEARCH_PATH = "/v1/tools/search"
+
+    # Circuit-breaker settings
+    _CB_FAILURE_THRESHOLD = 3
+    _CB_COOLDOWN_SECONDS = 300  # 5 minutes
+
+    _SNIPPET_LIMIT = 500
+    _MAX_QUERY_CHARS = 128  # API 限制：1~128 个 Unicode 字符
+
+    def __init__(
+        self,
+        api_keys: List[str],
+        base_url: Optional[str] = None,
+        need_content: bool = False,
+    ):
+        super().__init__(api_keys, "DeepSeek")
+        self._base_url = self._normalize_base_url(base_url)
+        self._need_content = bool(need_content)
+        # Circuit breaker state
+        self._consecutive_failures = 0
+        self._circuit_open_until: float = 0.0
+
+    @classmethod
+    def _normalize_base_url(cls, base_url: Optional[str]) -> str:
+        """Accept ``https://api.deepseek.com`` or ``.../v1`` and normalize to the root."""
+        raw = (base_url or "").strip() or cls.DEFAULT_BASE_URL
+        trimmed = raw.rstrip("/")
+        if trimmed.endswith("/v1"):
+            trimmed = trimmed[:-3].rstrip("/")
+        return trimmed or cls.DEFAULT_BASE_URL
+
+    @property
+    def endpoint(self) -> str:
+        return f"{self._base_url}{self.SEARCH_PATH}"
+
+    @property
+    def is_available(self) -> bool:
+        """Check availability considering circuit breaker state."""
+        with self._state_lock:
+            if not self._api_keys:
+                return False
+            if self._consecutive_failures >= self._CB_FAILURE_THRESHOLD:
+                if time.time() < self._circuit_open_until:
+                    return False
+                # Cooldown expired -> half-open, allow one probe
+            return True
+
+    def _record_success(self, key: str) -> None:
+        with self._state_lock:
+            super()._record_success(key)
+            self._consecutive_failures = 0
+            self._circuit_open_until = 0.0
+
+    def _record_error(self, key: str) -> None:
+        warning_message = None
+        with self._state_lock:
+            super()._record_error(key)
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= self._CB_FAILURE_THRESHOLD:
+                self._circuit_open_until = time.time() + self._CB_COOLDOWN_SECONDS
+                warning_message = (
+                    f"[DeepSeek] Circuit breaker OPEN – "
+                    f"{self._consecutive_failures} consecutive failures, "
+                    f"cooldown {self._CB_COOLDOWN_SECONDS}s"
+                )
+        if warning_message:
+            logger.warning(warning_message)
+
+    def _build_query(self, query: str, days: int) -> str:
+        """Push the recency window into the query with the ``after:`` operator."""
+        normalized = (query or "").strip()
+        operator = _search_recency_operator(days)
+        if operator and "after:" not in normalized:
+            candidate = f"{normalized} {operator}"
+            if len(candidate) <= self._MAX_QUERY_CHARS:
+                normalized = candidate
+            else:
+                logger.debug(
+                    "[DeepSeek] query 已接近 %s 字符上限，跳过 after: 下推，仅做客户端时间过滤",
+                    self._MAX_QUERY_CHARS,
+                )
+        return normalized[: self._MAX_QUERY_CHARS]
+
+    def _do_search(self, query: str, api_key: str, max_results: int, days: int = 7) -> SearchResponse:
+        """Execute a DeepSeek web search."""
+        count = max(1, min(50, int(max_results)))
+        try:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            payload: Dict[str, Any] = {
+                "query": self._build_query(query, days),
+                "count": count,
+                "need_content": self._need_content,
+            }
+
+            response = _post_with_retry(self.endpoint, headers=headers, json=payload, timeout=20)
+
+            if response.status_code != 200:
+                error_msg = self._parse_http_error(response)
+                logger.warning(f"[DeepSeek] Search failed: {error_msg}")
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    provider=self.name,
+                    success=False,
+                    error_message=error_msg,
+                )
+
+            data = response.json() if response.content else {}
+            raw_results = data.get("results") if isinstance(data, dict) else None
+            if not isinstance(raw_results, list):
+                error_msg = "响应缺少 results 数组"
+                logger.warning(f"[DeepSeek] {error_msg}: {str(data)[:200]}")
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    provider=self.name,
+                    success=False,
+                    error_message=error_msg,
+                )
+
+            logger.info(f"[DeepSeek] Search done, query='{query}', raw={len(raw_results)}")
+
+            results: List[SearchResult] = []
+            for item in raw_results:
+                if not isinstance(item, dict):
+                    continue
+
+                date_val = item.get("date")
+                # Client-side fallback filter: server-side after: is best-effort
+                if not _search_date_within_days(date_val, days):
+                    continue
+
+                url = str(item.get("url") or "").strip()
+                snippet = (
+                    item.get("summary")
+                    or item.get("snippet")
+                    or item.get("content")
+                    or ""
+                )
+                results.append(SearchResult(
+                    title=str(item.get("title") or "").strip(),
+                    snippet=str(snippet).strip()[: self._SNIPPET_LIMIT],
+                    url=url,
+                    source=(item.get("site_name") or self._extract_domain(url)),
+                    published_date=date_val,
+                ))
+
+                if len(results) >= max_results:
+                    break
+
+            logger.info(f"[DeepSeek] Parsed {len(results)} results (after time filter)")
+
+            return SearchResponse(
+                query=query,
+                results=results,
+                provider=self.name,
+                success=True,
+            )
+
+        except requests.exceptions.Timeout:
+            error_msg = "Request timeout"
+            logger.error(f"[DeepSeek] {error_msg}")
+            return SearchResponse(
+                query=query, results=[], provider=self.name,
+                success=False, error_message=error_msg,
+            )
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Network error: {e}"
+            logger.error(f"[DeepSeek] {error_msg}")
+            return SearchResponse(
+                query=query, results=[], provider=self.name,
+                success=False, error_message=error_msg,
+            )
+        except Exception as e:
+            error_msg = f"Unexpected error: {e}"
+            logger.error(f"[DeepSeek] {error_msg}")
+            return SearchResponse(
+                query=query, results=[], provider=self.name,
+                success=False, error_message=error_msg,
+            )
+
+    @staticmethod
+    def _parse_http_error(response) -> str:
+        """Parse the OpenAI-compatible error body returned by DeepSeek."""
+        status = getattr(response, "status_code", 0)
+        try:
+            payload = response.json()
+            if isinstance(payload, dict):
+                error = payload.get("error")
+                if isinstance(error, dict):
+                    message = error.get("message")
+                    if message:
+                        return f"HTTP {status}: {message}"
+                if payload.get("message"):
+                    return f"HTTP {status}: {payload['message']}"
+        except Exception:
+            pass
+        body = (getattr(response, "text", "") or "")[:200]
+        hint = ""
+        if status == 401:
+            hint = "（API Key 无效或未授权）"
+        elif status == 429:
+            hint = "（限速或配额不足）"
+        return f"HTTP {status}{hint}: {body}" if body else f"HTTP {status}{hint}"
+
+    @staticmethod
+    def _extract_domain(url: str) -> str:
+        """Extract domain from URL as source label."""
+        try:
+            parsed = urlparse(url)
+            return parsed.netloc.replace('www.', '') or '未知来源'
+        except Exception:
+            return '未知来源'
+
+
 class MiniMaxSearchProvider(BaseSearchProvider):
     """
     MiniMax Web Search (Coding Plan API)
@@ -1461,24 +1739,7 @@ class MiniMaxSearchProvider(BaseSearchProvider):
     @staticmethod
     def _time_hint(days: int, is_chinese: bool = True) -> str:
         """Build a time-hint string to append to the search query."""
-        if is_chinese:
-            if days <= 1:
-                return "今天"
-            elif days <= 3:
-                return "最近三天"
-            elif days <= 7:
-                return "最近一周"
-            else:
-                return "最近一个月"
-        else:
-            if days <= 1:
-                return "today"
-            elif days <= 3:
-                return "past 3 days"
-            elif days <= 7:
-                return "past week"
-            else:
-                return "past month"
+        return _search_time_hint(days, is_chinese=is_chinese)
 
     @staticmethod
     def _is_within_days(date_str: Optional[str], days: int) -> bool:
@@ -1488,16 +1749,7 @@ class MiniMaxSearchProvider(BaseSearchProvider):
         ``Jun 1, 2025``, ISO-8601 with timezone, etc.
         Returns True when date_str is None or unparseable (keep the result).
         """
-        if not date_str:
-            return True
-        try:
-            from dateutil import parser as dateutil_parser
-            dt = dateutil_parser.parse(date_str, fuzzy=True)
-            from datetime import timedelta, timezone
-            now = datetime.now(timezone.utc) if dt.tzinfo else datetime.now()
-            return (now - dt) <= timedelta(days=days + 1)  # +1 buffer
-        except Exception:
-            return True  # Keep result when date is unparseable
+        return _search_date_within_days(date_str, days)
 
     # ------------------------------------------------------------------
 
@@ -2409,6 +2661,9 @@ class SearchService:
         brave_keys: Optional[List[str]] = None,
         serpapi_keys: Optional[List[str]] = None,
         minimax_keys: Optional[List[str]] = None,
+        deepseek_keys: Optional[List[str]] = None,
+        deepseek_base_url: Optional[str] = None,
+        deepseek_need_content: bool = False,
         searxng_base_urls: Optional[List[str]] = None,
         searxng_public_instances_enabled: bool = False,
         searxng_timeout_seconds: Optional[int] = None,
@@ -2425,6 +2680,9 @@ class SearchService:
             brave_keys: Brave Search API Key 列表
             serpapi_keys: SerpAPI Key 列表
             minimax_keys: MiniMax API Key 列表
+            deepseek_keys: DeepSeek Search API Key 列表（可与 DeepSeek 模型共用同一把 Key）
+            deepseek_base_url: DeepSeek API Base URL（默认官方 https://api.deepseek.com）
+            deepseek_need_content: 是否让 DeepSeek 搜索直接返回网页正文
             searxng_base_urls: SearXNG 实例地址列表（自建无配额兜底）
             searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例
             news_max_age_days: 新闻最大时效（天）
@@ -2437,6 +2695,9 @@ class SearchService:
             "brave_keys": list(brave_keys or []),
             "serpapi_keys": list(serpapi_keys or []),
             "minimax_keys": list(minimax_keys or []),
+            "deepseek_keys": list(deepseek_keys or []),
+            "deepseek_base_url": deepseek_base_url,
+            "deepseek_need_content": bool(deepseek_need_content),
             "searxng_base_urls": list(searxng_base_urls or []),
             "searxng_public_instances_enabled": bool(searxng_public_instances_enabled),
             "searxng_timeout_seconds": searxng_timeout_seconds,
@@ -2462,6 +2723,17 @@ class SearchService:
         )
 
         # 初始化搜索引擎（按优先级排序）
+        # 0. DeepSeek 官方 Search API（结构化结果，可与 LLM 共用同一把 Key）
+        if deepseek_keys:
+            self._providers.append(
+                DeepSeekSearchProvider(
+                    deepseek_keys,
+                    base_url=deepseek_base_url,
+                    need_content=deepseek_need_content,
+                )
+            )
+            logger.info(f"已配置 DeepSeek 搜索，共 {len(deepseek_keys)} 个 API Key")
+
         # 1. Bocha 优先（中文搜索优化，AI摘要）
         if bocha_keys:
             self._providers.append(BochaSearchProvider(bocha_keys))
@@ -4922,6 +5194,9 @@ def get_search_service() -> SearchService:
                     brave_keys=config.brave_api_keys,
                     serpapi_keys=config.serpapi_keys,
                     minimax_keys=config.minimax_api_keys,
+                    deepseek_keys=getattr(config, "deepseek_search_api_keys", None),
+                    deepseek_base_url=getattr(config, "deepseek_search_base_url", None),
+                    deepseek_need_content=bool(getattr(config, "deepseek_search_need_content", False)),
                     searxng_base_urls=config.searxng_base_urls,
                     searxng_public_instances_enabled=config.searxng_public_instances_enabled,
                     searxng_timeout_seconds=getattr(config, "searxng_timeout_seconds", None),

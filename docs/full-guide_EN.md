@@ -151,6 +151,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | Secret Name | Description | Required |
 |------------|------|:----:|
 | `STOCK_LIST` | Watchlist codes, e.g., `600519,300750,002594,7203.T,005930.KS`; English commas are recommended, while pasted Chinese commas, enumeration commas, semicolons, spaces, and newlines are recognized and normalized to English commas | ✅ |
+| `DEEPSEEK_SEARCH_API_KEYS` | [DeepSeek Search API](https://api-docs.deepseek.com/guides/search) key (structured results, supports `site:`/`lang:`/`after:`); when empty it reuses `DEEPSEEK_API_KEYS` / `DEEPSEEK_API_KEY` | Recommended |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) optimized for Chinese content; the same key can also be used for Anspire LLM fallback scenarios (example model: `Doubao-Seed-2.0-lite`) | Recommended |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/github-daily-stock-analysis) search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Optional |
@@ -341,7 +342,11 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 
 | Variable | Description | Required |
 |--------|------|:----:|
-| `ANSPIRE_API_KEYS` | Anspire Open API Key (shared with search and LLM fallback examples; availability depends on account/model entitlement, and can effectively enhance A-share analysis) | Recommended |
+| `DEEPSEEK_SEARCH_API_KEYS` | DeepSeek official Search API (in-house engine, structured results: title/url/summary/date/authority, supports `site:`/`lang:`/`after:`); when empty it reuses `DEEPSEEK_API_KEYS` / `DEEPSEEK_API_KEY` | Recommended |
+| `DEEPSEEK_SEARCH_ENABLED` | Reuse the DeepSeek key for news search (default `true`; set `false` when DeepSeek should only run the model) | Optional |
+| `DEEPSEEK_SEARCH_BASE_URL` | DeepSeek Search API base URL (default `https://api.deepseek.com`) | Optional |
+| `DEEPSEEK_SEARCH_NEED_CONTENT` | Ask the Search API to return full page `content` (default `false`; slower and larger payload) | Optional |
+| `ANSPIRE_API_KEYS` | Anspire Open API Key (shared with search and LLM fallback examples; availability depends on account/model entitlement, and can effectively enhance A-share analysis) | Optional |
 | `SERPAPI_API_KEYS` | SerpAPI search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | Tavily Search API Key | Optional |
 | `BOCHA_API_KEYS` | Bocha Search API Key (Chinese optimized) | Optional |

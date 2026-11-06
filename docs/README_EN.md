@@ -86,11 +86,12 @@ Start with one provider and one API key. For multi-model routing, image recognit
 
 | Secret Name | Description | Required |
 |-------------|-------------|:--------:|
-| `MODELFLARE_KEY` | [Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis) API key for leading global models at lower cost | **Recommended** |
-| `AIHUBMIX_KEY` | [AIHubMix](https://inferera.com/?aff=CfMq) API key, one key for multiple model families and a 10% top-up discount for this project | **Recommended** |
+| `DEEPSEEK_API_KEY` | [DeepSeek](https://platform.deepseek.com) API key: the main model defaults to `deepseek/deepseek-v4-flash`, and the same key also powers the DeepSeek news search below | **Recommended** |
+| `MODELFLARE_KEY` | [Modelflare](https://modelflare.dev/sign-up?utm_source=github&utm_campaign=daily_stock_analysis) API key for leading global models at lower cost | Optional |
+| `AIHUBMIX_KEY` | [AIHubMix](https://inferera.com/?aff=CfMq) API key, one key for multiple model families and a 10% top-up discount for this project | Optional |
 | `GEMINI_API_KEY` | Google Gemini API key | Optional |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API key | Optional |
-| `OPENAI_API_KEY` | OpenAI-compatible API key, including DeepSeek and Qwen-compatible services | Optional |
+| `OPENAI_API_KEY` | OpenAI-compatible API key, including Qwen-compatible services | Optional |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | Fill these when using an OpenAI-compatible provider | Optional |
 
 > Ollama is better suited for local or Docker deployment. GitHub Actions is usually smoother with a cloud API.
@@ -120,8 +121,9 @@ News search strongly improves sentiment, announcements, events, and catalyst qua
 
 | Secret Name | Description | Required |
 |-------------|-------------|:--------:|
-| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/dsa?share_code=QFBC0FYC), global market-sentiment aggregation tuned for news and sentiment search across A-share, US, and Hong Kong markets; the same key also works for the Anspire LLM service; new users of this project receive free credits worth CNY 30 | **Recommended** |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/github-daily-stock-analysis), search-engine results for realtime financial news | **Recommended** |
+| `DEEPSEEK_SEARCH_API_KEYS` | [DeepSeek Search API](https://api-docs.deepseek.com/guides/search), DeepSeek's in-house search engine returning structured results (title/url/summary/date/authority) with `site:`/`lang:`/`after:` query operators; **leave empty to reuse `DEEPSEEK_API_KEYS` / `DEEPSEEK_API_KEY` — one key runs both the model and the news search** | **Recommended** |
+| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/dsa?share_code=QFBC0FYC), global market-sentiment aggregation tuned for news and sentiment search across A-share, US, and Hong Kong markets; the same key also works for the Anspire LLM service; new users of this project receive free credits worth CNY 30 | Optional |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/github-daily-stock-analysis), search-engine results for realtime financial news | Optional |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/), general news search API | Optional |
 | `BOCHA_API_KEYS` | [Bocha](https://open.bocha.cn/), Chinese search with AI summaries | Optional |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/), privacy-first search and US-stock news enrichment | Optional |
